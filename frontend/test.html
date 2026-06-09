@@ -1,0 +1,20 @@
+<script>
+const ws = new WebSocket("ws://127.0.0.1:8000/stream/transcript?meeting_id=123&title=test");
+
+ws.onopen = () => {
+  console.log("CONNECTED");
+  ws.send("END"); // test trigger
+};
+
+ws.onmessage = (e) => {
+  console.log("MSG:", e.data);
+};
+
+ws.onerror = (e) => {
+  console.log("ERROR:", e);
+};
+
+ws.onclose = () => {
+  console.log("CLOSED");
+};
+</script>

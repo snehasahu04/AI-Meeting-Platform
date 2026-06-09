@@ -1,0 +1,73 @@
+name: Meeting AI Platform CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+jobs:
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python deps
+        run: pip install -r backend/requirements.txt
+        working-directory: .
+
+      - name: Run pytest
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DATABASE_URL: "sqlite:///./test.db"
+          KAFKA_BOOTSTRAP: "localhost:9092"
+        run: pytest tests/test_rag.py tests/test_ml.py tests/test_api.py -v --tb=short
+        working-directory: backend
+
+      - name: Validate API starts
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DATABASE_URL: "sqlite:///./test.db"
+          KAFKA_BOOTSTRAP: "localhost:9092"
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 8
+          curl -f http://localhost:8000/ || exit 1
+          echo "API health check passed"
+        working-directory: backend
+
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package.json
+
+      - name: Install deps
+        run: npm install
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+        env:
+          CI: false
